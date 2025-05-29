@@ -14,14 +14,16 @@ const app = express()
 app.use(express.json())
 app.use(express.static('public'))
 app.use(cors({
-    origin : ["http://localhost:3000"],
+    origin : ["http://localhost:3000","https://simply-client.vercel.app"],
     methods : ["GET","POST","PUT","DELETE"],
     credentials:true
 }
 ))
 app.use(cookieParser())
 
-mongoose.connect('mongodb://127.0.0.1:27017/SIMPLYPOSTS')
+// mongoose.connect('mongodb://127.0.0.1:27017/SIMPLYPOSTS')
+mongoose.connect(process.env.MONGO_URI)
+
 
 
 // app.post('/login',(req,res)=>{
@@ -133,7 +135,7 @@ const verifyuser = (req,res,next)=>{
 
 app.get('/home',verifyuser,(req,res)=>{
     res.json({email:req.email ,name:req.name})
-    res.json('homepage okkk')
+    // res.json('homepage okkk')
 
 })
 
@@ -206,6 +208,10 @@ app.get('/logout',(req,res)=>{
 
 
 
-app.listen(3001,()=>{
-    console.log('running');
-})
+// app.listen(3001,()=>{
+//     console.log('running');
+// })
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
