@@ -109,7 +109,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // Add Post
-app.post('/addpost', verifyUser, upload.single('file'), (req, res) => {
+app.post('/addpost', upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ msg: "No file uploaded" });
   }
