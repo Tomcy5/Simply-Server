@@ -1,4 +1,4 @@
-require('dotenv').config(); // Ensure this is at the top
+require('dotenv').config(); // Load env vars first
 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -13,9 +13,9 @@ const path = require('path');
 
 const app = express();
 
-// Middleware
+// Middlewares
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static('public')); // Must point to lowercase 'public'
 app.use(cors({
   origin: ["http://localhost:3000", "https://simply-client.vercel.app"],
   methods: ["GET", "POST", "PUT", "DELETE"],
@@ -23,17 +23,44 @@ app.use(cors({
 }));
 app.use(cookieParser());
 
-// Environment variables
+// Environment Variables
 const PORT = process.env.PORT || 3001;
 const MONGO_URI = process.env.MONGO_URI;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
-// Connect to MongoDB
+// MongoDB Connection
 mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
-}).then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB connection error:', err));
+}).then(() => console.log('✅ MongoDB connected'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
+
+// 🔐 Verify Token Middleware
+const verifyUser = (req, res, next) => {
+  const token = req.cookies.token;
+  if (!token) return res.json("token is not available");
+
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) return res.json("wrong token");
+    req.email = decoded.email;
+    req.name = decoded.name;
+    next();
+  });
+};
+
+// ✅ Routes
+
+// Register
+app.post('/', (req, res) => {
+  const { name, email, password } = req.body;
+  bcrypt.hash(password, 10)
+    .then(hash => {
+      UserModel.create({ name, email, password: hash })
+        .then(result => res.json(result))
+        .catch(err => res.json(err));
+    })
+    .catch(err => res.json(err));
+});
 
 // Login
 app.post('/login', async (req, res) => {
@@ -65,49 +92,28 @@ app.post('/login', async (req, res) => {
   }
 });
 
-// Register (still on '/')
-app.post('/', (req, res) => {
-  const { name, email, password } = req.body;
-  bcrypt.hash(password, 10)
-    .then(hash => {
-      UserModel.create({ name, email, password: hash })
-        .then(result => res.json(result))
-        .catch(err => res.json(err));
-    })
-    .catch(err => res.json(err));
-});
-
-// Verify User Middleware
-const verifyUser = (req, res, next) => {
-  const token = req.cookies.token;
-  if (!token) return res.json("token is not available");
-
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) return res.json("wrong token");
-    req.email = decoded.email;
-    req.name = decoded.name;
-    next();
-  });
-};
-
-// Home route
+// Home
 app.get('/home', verifyUser, (req, res) => {
   res.json({ email: req.email, name: req.name });
 });
 
-// Multer setup
+// Multer Config (temporary disk storage)
 const storage = multer.diskStorage({
-  destination: (req, file, callb) => {
-    callb(null, 'Public/Images');
+  destination: (req, file, cb) => {
+    cb(null, 'public/Images'); // Folder must exist and be lowercase
   },
-  filename: (req, file, callb) => {
-    callb(null, file.fieldname + "_" + Date.now() + path.extname(file.originalname));
+  filename: (req, file, cb) => {
+    cb(null, file.fieldname + "_" + Date.now() + path.extname(file.originalname));
   }
 });
 const upload = multer({ storage: storage });
 
 // Add Post
 app.post('/addpost', verifyUser, upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ msg: "No file uploaded" });
+  }
+
   PostModel.create({
     title: req.body.title,
     description: req.body.description,
@@ -124,7 +130,7 @@ app.get('/getposts', (req, res) => {
     .catch(err => res.json(err));
 });
 
-// View Post
+// View Single Post
 app.get('/viewpost/:id', (req, res) => {
   PostModel.findById(req.params.id)
     .then(result => res.json(result))
@@ -161,13 +167,13 @@ app.get('/logout', (req, res) => {
   res.json("cookie cleared");
 });
 
-// Global error handler (optional)
+// Error Handling (optional)
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ msg: "Something broke!" });
 });
 
-// Start server
+// Start Server
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
